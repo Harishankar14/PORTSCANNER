@@ -1,0 +1,110 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class PortScannerUI extends JFrame {
+    private JTextField hostField;
+    private JTextField startPortField;
+    private JTextField endPortField;
+    private JButton scanButton;
+    private JTextArea resultArea;
+
+    public PortScannerUI() {
+        setTitle("Port Scanner");
+        setSize(400, 300);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null); // Center the window
+        setLayout(new BorderLayout());
+
+        // Panel for input fields and scan button
+        JPanel inputPanel = new JPanel(new GridLayout(4, 2));
+        inputPanel.add(new JLabel("Host:"));
+        hostField = new JTextField("localhost");
+        inputPanel.add(hostField);
+        inputPanel.add(new JLabel("Start Port:"));
+        startPortField = new JTextField("1");
+        inputPanel.add(startPortField);
+        inputPanel.add(new JLabel("End Port:"));
+        endPortField = new JTextField("1024");
+        inputPanel.add(endPortField);
+        scanButton = new JButton("Scan Ports");
+        scanButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                startScan();
+            }
+        });
+        inputPanel.add(scanButton);
+
+        // Panel for scan results
+        resultArea = new JTextArea();
+        resultArea.setEditable(false);
+        JScrollPane scrollPane = new JScrollPane(resultArea);
+
+        add(inputPanel, BorderLayout.NORTH);
+        add(scrollPane, BorderLayout.CENTER);
+    }
+
+    private void startScan() {
+        String host = hostField.getText();
+        int startPort = Integer.parseInt(startPortField.getText());
+        int endPort = Integer.parseInt(endPortField.getText());
+        int numThreads = 50; // Number of threads for multithreading
+
+        // Create a thread pool
+        ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+
+        // Loop through the port range
+        for (int port = startPort; port <= endPort; port++) {
+            // Submit a task to the thread pool
+            executor.submit(new PortScannerTask(host, port));
+        }
+
+        // Shutdown the thread pool
+        executor.shutdown();
+    }
+
+    private class PortScannerTask implements Runnable {
+        private String host;
+        private int port;
+
+        public PortScannerTask(String host, int port) {
+            this.host = host;
+            this.port = port;
+        }
+
+        @Override
+        public void run() {
+            try {
+                // Attempt to create a socket connection with timeout
+                Socket socket = new Socket();
+                socket.connect(new InetSocketAddress(host, port), 1000);
+
+                // If successful, append the result to the result area
+                resultArea.append("Port " + port + " is open\n");
+
+                // Close the socket
+                socket.close();
+            } catch (ConnectException e) {
+                // Port is closed or unreachable
+                resultArea.append("Port " + port + " is closed\n");
+            } catch (SocketTimeoutException e) {
+                // Connection timed out
+                resultArea.append("Port " + port + " connection timed out\n");
+            } catch (Exception e) {
+                // Other exceptions
+                resultArea.append("Error occurred while scanning port " + port + ": " + e.getMessage() + "\n");
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                new PortScannerUI().setVisible(true);
+            }
+        });
+    }
+}
